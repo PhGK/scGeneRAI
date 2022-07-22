@@ -18,6 +18,8 @@ rand_data = load_data('random')
 
 predictor = scGeneRAI()
 
-predictor.fit(rand_data, nepochs = 200, lr = 1e-4, model_depth = 2)
+predictor.fit(rand_data, nepochs = 10, lr = 1e-4, model_depth = 2)
+
+predictor.predict_networks(rand_data, PATH)
 
 

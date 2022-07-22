@@ -168,17 +168,34 @@ class scGeneRAI:
         all_ids = tc.randperm(self.nsamples)
         self.train_ids, self.test_ids = all_ids[:self.nsamples//10*9], all_ids[self.nsamples//10*9:]
 
-        train(self.nn, self.data_tensor[self.train_ids], self.data_tensor[self.test_ids], nepochs, lr=lr, batch_size=batch_size,  lr_decay=lr_decay, device=device)
+        testlosses, epoch_list, network_list = train(self.nn, self.data_tensor[self.train_ids], self.data_tensor[self.test_ids], nepochs, lr=lr, batch_size=batch_size,  lr_decay=lr_decay, device=device)
 
         if early_stopping:
             mindex = tc.argmin(testlosses)
             min_network = network_list[mindex]
+            self.epochs_trained = epoch_list[mindex]
         
             self.nn = NN(2*(self.nfeatures + self.descriptor_features), self.nfeatures, self.hidden, self.depth)
             self.nn.load_state_dict(min_network)
+        else:
+           self.epochs_trained = nepochs
 
 
-    def predict_LRP():
+    def predict_networks(self, data, PATH):
+        if not os.path.exists(PATH + '/results/'):
+            os.makedirs(PATH + '/results/')
+
+        nsamples_LRP, nfeatures_LRP = data.shape
+        assert nfeatures_LRP == self.nfeatures, 'neural network has been trained on a differnet number of input features'
+
+        
+        sample_names_LRP = data.index
+        feature_names_LRP = data.columns
+        data_tensor_LRP = tc.tensor(np.array(data)).float()
+
+        for sample_id, sample_name in enumerate(sample_names_LRP):
+            calc_all_paths(self.nn, data_tensor_LRP, sample_id, sample_name, feature_names_LRP, PATH, batch_size=100, LRPau = True, device = tc.device('cpu'))
+        
         
 
 
@@ -252,9 +269,9 @@ def train(neuralnet, train_data, test_data, epochs, lr, batch_size, lr_decay, de
 
 
 
-def compute_LRP(neuralnet, test_set, test_onehot, target_id, sample_id, batch_size, device):
+def compute_LRP(neuralnet, test_set, target_id, sample_id, batch_size, device):
     criterion = nn.MSELoss()
-    testset = Dataset_LRP(test_set,test_onehot, target_id, sample_id)
+    testset = Dataset_LRP(test_set,target_id, sample_id)
     testloader = DataLoader(testset, batch_size=batch_size, shuffle=True)
 
     neuralnet.to(device).eval()
@@ -269,7 +286,7 @@ def compute_LRP(neuralnet, test_set, test_onehot, target_id, sample_id, batch_si
 
     R = tc.zeros_like(pred)
     R[:,target_id] = pred[:,target_id].clone()
-    #R = R.to(device)
+
     a = neuralnet.relprop(R)
     LRP_sum = (a.sum(dim=0))
 
@@ -285,23 +302,41 @@ def compute_LRP(neuralnet, test_set, test_onehot, target_id, sample_id, batch_si
     return LRP_scaled.cpu().numpy(), error, y , y_pred, full_data_sample
 
 
-def calc_all_paths(neuralnet, test_data,test_onehot, sample_id, sample_name, featurenames, data_type, result_path, device = tc.device('cuda:0')):
-    #if not os.path.exists(result_path + data_type + '/'):
-    #    os.makedirs(result_path + data_type + '/')
+def calc_all_paths(neuralnet, test_data, sample_id, sample_name, featurenames, PATH, batch_size=100, LRPau = True, device = tc.device('cpu')):
     end_frame = []
     print(sample_id)
     for target in range(test_data.shape[1]):
-        LRP_value, error, y, y_pred, full_data_sample = compute_LRP(neuralnet, test_data, test_onehot, target, sample_id, batch_size = 100, device = device)
+        LRP_value, error, y, y_pred, full_data_sample = compute_LRP(neuralnet, test_data, target, sample_id, batch_size = batch_size, device = device)
 
         frame = pd.DataFrame({'LRP': LRP_value, 'source_gene': featurenames, 'target_gene': featurenames[target] ,'sample_name': sample_name, 'error':error, 'y':y, 'y_pred':y_pred, \
             'inpv': full_data_sample})
        
 
         end_frame.append(frame)
-        end_result_path = result_path + data_type + '/'  + 'LRP_' + str(sample_id) + '_'+ sample_name + '.csv'
-        if not os.path.exists(result_path + data_type):
-            os.makedirs(result_path + data_type)
+        end_result_path = PATH + '/results/'  + 'LRP_' + str(sample_id) + '_'+ str(sample_name) + '.csv'
+        #if not os.path.exists(result_path + data_type):
+        #    os.makedirs(result_path + data_type)
 
     end_frame = pd.concat(end_frame, axis=0)
+
+    if LRPau:
+        end_frame_re = end_frame.copy()
+        end_frame_re['LRP_abs_re'] = np.abs(end_frame_re['LRP']) 
+        end_frame_re = end_frame_re[['LRP_abs_re', 'source_gene', 'target_gene']]
+        end_frame_kontra = end_frame_re.rename(columns = {'LRP_abs_re': 'LRP_abs_kontra','source_gene': 'target_gene', 'target_gene': 'source_gene'})
+
+        end_frame_au = end_frame_re.merge(end_frame_kontra)
+
+        end_frame_au['LRP'] = 0.5 * (end_frame_au['LRP_abs_re'] + end_frame_au['LRP_abs_kontra'])    
+
+        end_frame = end_frame_au.copy()[['LRP', 'source_gene', 'target_gene']]
+        end_frame = end_frame[end_frame['source_gene']>end_frame['target_gene']]
+
+
+
     end_frame.to_csv(end_result_path)
+
+
+
+
 
