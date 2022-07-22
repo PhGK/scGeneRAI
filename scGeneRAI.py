@@ -11,6 +11,7 @@ import pandas as pd
 
 from dataloading_simple import Dataset_train, Dataset_LRP
 import os
+from tqdm import tqdm
 
 
 class LogCoshLoss(nn.Module):
@@ -172,6 +173,7 @@ class scGeneRAI:
 
         if early_stopping:
             mindex = tc.argmin(testlosses)
+            self.actual_testloss = testlosses[mindex]
             min_network = network_list[mindex]
             self.epochs_trained = epoch_list[mindex]
         
@@ -179,6 +181,9 @@ class scGeneRAI:
             self.nn.load_state_dict(min_network)
         else:
            self.epochs_trained = nepochs
+           self.actual_testloss = testlosses[-1]
+
+        print('the network trained for {} epochs (testloss: {})'.format(nepochs, self.actual_testloss))
 
 
     def predict_networks(self, data, PATH):
@@ -213,9 +218,9 @@ def train(neuralnet, train_data, test_data, epochs, lr, batch_size, lr_decay, de
 
     neuralnet.train().to(device)
 
-    for epoch in range(epochs):
-        if epoch<20:
-            optimizer.param_groups[0]['lr']=lr/20*(epoch+1)
+    for epoch in tqdm(range(epochs)):
+        if epoch<5:
+            optimizer.param_groups[0]['lr']=lr/5*(epoch+1)
 
         trainset = Dataset_train(train_data)
         trainloader = DataLoader(trainset, batch_size=batch_size, shuffle=True)
@@ -236,7 +241,7 @@ def train(neuralnet, train_data, test_data, epochs, lr, batch_size, lr_decay, de
             
 
         if epoch%10==0:
-            print(optimizer.param_groups[0]['lr'])
+            #print(optimizer.param_groups[0]['lr'])
             neuralnet.eval()
             testset = Dataset_train(test_data)
             traintestset = Dataset_train(train_data)
@@ -262,8 +267,9 @@ def train(neuralnet, train_data, test_data, epochs, lr, batch_size, lr_decay, de
                 with tc.no_grad():
                     pred = neuralnet(masked_data)
                 traintestloss = criterion(pred[mask==0], full_data[mask==0])
-                print(epoch, 'trainloss:', traintestloss, 'testloss:', testloss)
+                #print(epoch, 'trainloss:', traintestloss, 'testloss:', testloss)
                 break
+    
     return tc.tensor(testlosses), epoch_list, network_list
 
 
@@ -304,7 +310,6 @@ def compute_LRP(neuralnet, test_set, target_id, sample_id, batch_size, device):
 
 def calc_all_paths(neuralnet, test_data, sample_id, sample_name, featurenames, PATH, batch_size=100, LRPau = True, device = tc.device('cpu')):
     end_frame = []
-    print(sample_id)
     for target in range(test_data.shape[1]):
         LRP_value, error, y, y_pred, full_data_sample = compute_LRP(neuralnet, test_data, target, sample_id, batch_size = batch_size, device = device)
 
