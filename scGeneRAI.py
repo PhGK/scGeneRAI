@@ -152,24 +152,33 @@ class scGeneRAI:
     def __init__(self):
         pass
 
-    def fit(self, data, model_depth, nepochs, lr=2e-2, batch_size=50, lr_decay = 0.995, early_stopping = True, device = tc.device('cpu')):
-        self.data = data
+    def fit(self, data, model_depth, nepochs, lr=2e-2, batch_size=50, lr_decay = 0.995, descriptors = None, early_stopping = True, device_name = 'cpu'):
+
+        self.simple_features = data.shape[1]
+        if descriptors is not None:
+            self.onehotter = OneHotter()
+            one_hot_descriptors = self.onehotter.make_one_hot_new(descriptors)
+            self.data = pd.concat([data, one_hot_descriptors], axis=1)
+
+        else:
+            self.data = data
+
+
         self.nsamples, self.nfeatures = self.data.shape
-        self.descriptor_features = 0
         self.hidden = 2*self.nfeatures
         self.depth = model_depth
 
-        self.sample_names = data.index
-        self.feature_names = data.columns
-        self.data_tensor = tc.tensor(np.array(data)).float()
+        self.sample_names = self.data.index
+        self.feature_names = self.data.columns
+        self.data_tensor = tc.tensor(np.array(self.data)).float()
 
-        self.nn = NN(2*(self.nfeatures + self.descriptor_features), self.nfeatures, self.hidden, self.depth)
+        self.nn = NN(2*(self.nfeatures), self.nfeatures, self.hidden, self.depth)
 
         tc.manual_seed(0)
         all_ids = tc.randperm(self.nsamples)
         self.train_ids, self.test_ids = all_ids[:self.nsamples//10*9], all_ids[self.nsamples//10*9:]
 
-        testlosses, epoch_list, network_list = train(self.nn, self.data_tensor[self.train_ids], self.data_tensor[self.test_ids], nepochs, lr=lr, batch_size=batch_size,  lr_decay=lr_decay, device=device)
+        testlosses, epoch_list, network_list = train(self.nn, self.data_tensor[self.train_ids], self.data_tensor[self.test_ids], nepochs, lr=lr, batch_size=batch_size,  lr_decay=lr_decay, device_name=device_name)
 
         if early_stopping:
             mindex = tc.argmin(testlosses)
@@ -177,7 +186,7 @@ class scGeneRAI:
             min_network = network_list[mindex]
             self.epochs_trained = epoch_list[mindex]
         
-            self.nn = NN(2*(self.nfeatures + self.descriptor_features), self.nfeatures, self.hidden, self.depth)
+            self.nn = NN(2*(self.nfeatures), self.nfeatures, self.hidden, self.depth)
             self.nn.load_state_dict(min_network)
         else:
            self.epochs_trained = nepochs
@@ -186,29 +195,67 @@ class scGeneRAI:
         print('the network trained for {} epochs (testloss: {})'.format(nepochs, self.actual_testloss))
 
 
-    def predict_networks(self, data, PATH):
+    def predict_networks(self, data, descriptors = None, LRPau = True, remove_descriptors = True, device_name = 'cpu', PATH = '.'):
         if not os.path.exists(PATH + '/results/'):
             os.makedirs(PATH + '/results/')
 
-        nsamples_LRP, nfeatures_LRP = data.shape
-        assert nfeatures_LRP == self.nfeatures, 'neural network has been trained on a differnet number of input features'
+
+        if descriptors is not None:
+            one_hot_descriptors = self.onehotter.make_one_hot(descriptors)
+            assert one_hot_descriptors.shape[0] == data.shape[0], 'descriptors ({}) need to have same sample size as data ({})'.format(one_hot_descriptors.shape[0],data.shape[0])
+            data_extended = pd.concat([data, one_hot_descriptors], axis=1)
+   
+        else:
+            data_extended = data
+
+        nsamples_LRP, nfeatures_LRP = data_extended.shape
+        assert nfeatures_LRP == self.nfeatures, 'neural network has been trained on {} input features, now there are  {}'.format(self.nfeatures, nfeatures_LRP)
 
         
-        sample_names_LRP = data.index
-        feature_names_LRP = data.columns
-        data_tensor_LRP = tc.tensor(np.array(data)).float()
+        sample_names_LRP = data_extended.index
+        feature_names_LRP = data_extended.columns
+        data_tensor_LRP = tc.tensor(np.array(data_extended)).float()
+        
+        target_gene_range = self.simple_features if remove_descriptors else data_tensor_LRP.shape[1]
 
         for sample_id, sample_name in enumerate(sample_names_LRP):
-            calc_all_paths(self.nn, data_tensor_LRP, sample_id, sample_name, feature_names_LRP, PATH, batch_size=100, LRPau = True, device = tc.device('cpu'))
+            calc_all_paths(self.nn, data_tensor_LRP, sample_id, sample_name, feature_names_LRP, target_gene_range = target_gene_range, PATH=PATH, batch_size=100, LRPau = LRPau, device = tc.device(device_name))
         
         
 
+class OneHotter:
+    def __init__(self):
+        pass
 
+    def make_one_hot_new(self,descriptors):
+        columns = []
+        self.level_dict = {}
+        for col in descriptors.columns:
+            sel_col = descriptors[col]
+            levels = sel_col.unique()
+            self.level_dict[col] = levels
+            one_hot = (np.array(sel_col)[:,None] == levels[None,:])*1.0
+            colnames = [col + '=' + level for level in levels]
+            one_hot_frame = pd.DataFrame(one_hot, columns = colnames)
+            columns.append(one_hot_frame)
+        return pd.concat(columns, axis=1)
+
+    def make_one_hot(self, descriptors):
+        columns = []
+        for col in descriptors.columns:
+            sel_col = descriptors[col]
+            levels = self.level_dict[col]
+            one_hot = (np.array(sel_col)[:,None] == levels[None,:])*1.0
+            colnames = [col + '=' + level for level in levels]
+            one_hot_frame = pd.DataFrame(one_hot, columns = colnames)
+            columns.append(one_hot_frame)
+        return pd.concat(columns, axis=1)
         
 
 
 
-def train(neuralnet, train_data, test_data, epochs, lr, batch_size, lr_decay, device):
+def train(neuralnet, train_data, test_data, epochs, lr, batch_size, lr_decay, device_name):
+    device = tc.device(device_name)
     nsamples, nfeatures = train_data.shape
     optimizer = tc.optim.SGD(neuralnet.parameters(), lr=lr, momentum=0.9) 
     scheduler = ExponentialLR(optimizer, gamma = lr_decay)
@@ -308,13 +355,14 @@ def compute_LRP(neuralnet, test_set, target_id, sample_id, batch_size, device):
     return LRP_scaled.cpu().numpy(), error, y , y_pred, full_data_sample
 
 
-def calc_all_paths(neuralnet, test_data, sample_id, sample_name, featurenames, PATH, batch_size=100, LRPau = True, device = tc.device('cpu')):
+def calc_all_paths(neuralnet, test_data, sample_id, sample_name, featurenames, target_gene_range, PATH, batch_size=100, LRPau = True, device = tc.device('cpu')):
     end_frame = []
-    for target in range(test_data.shape[1]):
+
+    for target in range(target_gene_range):
         LRP_value, error, y, y_pred, full_data_sample = compute_LRP(neuralnet, test_data, target, sample_id, batch_size = batch_size, device = device)
 
-        frame = pd.DataFrame({'LRP': LRP_value, 'source_gene': featurenames, 'target_gene': featurenames[target] ,'sample_name': sample_name, 'error':error, 'y':y, 'y_pred':y_pred, \
-            'inpv': full_data_sample})
+        frame = pd.DataFrame({'LRP': LRP_value[:target_gene_range], 'source_gene': featurenames[:target_gene_range], 'target_gene': featurenames[target] ,
+                'sample_name': sample_name, 'error':error, 'y':y, 'y_pred':y_pred, 'inpv': full_data_sample[:target_gene_range]})
        
 
         end_frame.append(frame)
