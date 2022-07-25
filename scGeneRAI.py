@@ -152,7 +152,7 @@ class scGeneRAI:
     def __init__(self):
         pass
 
-    def fit(self, data, model_depth, nepochs, lr=2e-2, batch_size=50, lr_decay = 0.995, descriptors = None, early_stopping = True, device_name = 'cpu'):
+    def fit(self, data, nepochs, model_depth, lr=2e-2, batch_size=50, lr_decay = 0.995, descriptors = None, early_stopping = True, device_name = 'cpu'):
 
         self.simple_features = data.shape[1]
         if descriptors is not None:
@@ -192,7 +192,7 @@ class scGeneRAI:
            self.epochs_trained = nepochs
            self.actual_testloss = testlosses[-1]
 
-        print('the network trained for {} epochs (testloss: {})'.format(nepochs, self.actual_testloss))
+        print('the network trained for {} epochs (testloss: {})'.format(self.epochs_trained, self.actual_testloss))
 
 
     def predict_networks(self, data, descriptors = None, LRPau = True, remove_descriptors = True, device_name = 'cpu', PATH = '.'):
