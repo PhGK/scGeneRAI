@@ -1,24 +1,27 @@
-# GeneNetworkLRP
-Gene networks
-
-# train network:
-./train_network
---> starts main_large.py with training flag in slurm
-
-
-# compute LRP values:
-./start_batch_LRP_array
---> starts main_large.py for every cell in slurm to compute LRP, network must be trained before
-
-
-# compute LRPau scores
-./loop_LRP_au 
---> loops through cells for which raw LRP scores are computed 
---> starts SLURM script with create_LRPau.py for every cell to compute LRP_au scores
-
-
-# pull highest LRP_au scores from every cell
-./loop_start_highest_int_with_name
---> loops through all LRP_au files
---> starts start_filter_higehst_interactions --> starts filter_h_i_without_dask.py
---> manually start concat_highinteractions.py --> creates file high_values_concat.csv
+# GeneRAI<sup>sc
+  
+```python
+  from scGeneRAI import scGeneRAI
+  
+```
+  initialize model and fit data
+```
+  model = scGeneRAI()
+  model.fit(data, model_depth, nepochs, lr=2e-2, batch_size=50, lr_decay = 0.995, descriptors = None, early_stopping = True, device_name = 'cpu')
+  
+```
+- data: A pandas dataframe consisting of shape m x n, containing RNA samples of m cells and n genes.
+- nepochs: Number of training epochs
+- model_depth: (default=2)
+- lr: learning rate of stochastic gradient descent optimizer (default=2e-2)
+- batch_size (default=50)
+- lr_decay: Learning rate decay using pytorch exponential learning rate scheduler (lr_decay orresponds to pythorch's gamma, default: 0.995)
+- descriptors: Pandas frame of additional **categorical** cell descriptors, e.g. batch, cell type. Need to have the same sample size as *data*  (default=None)
+- early_stopping: If True, scGeneRAI chooses the model with the smallest test loss during training (default=True).
+- device_name: can be used to run computation on GPU (e.g. with 'cuda:0', default='cpu'). device_name is give to torch.device().
+  
+  
+  predict networks 
+```
+  model.predict_networks(...)
+```
