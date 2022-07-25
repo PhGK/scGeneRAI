@@ -32,7 +32,7 @@
   
 - LRPau: If *True*, predict_networks() returns the absolute undirected LRP scores between every pair of genes (deault=True)
 - remove_descriptors: If *True*, interactions between data features and descriptor features are omitted (default=True)
-- device_name: can be used to run computation on GPU (e.g. with 'cuda:0', default='cpu'). device_name is give to torch.device().
+- device_name: Can be used to run computation on GPU (e.g. with 'cuda:0', default='cpu'). device_name is give to torch.device().
 - PATH: PATH defines the location where locations shall be saved. (default = '.')
   
 
