@@ -1,4 +1,4 @@
-# GeneRAI<sup>sc
+# scGeneRAI
   
 ```python
   from scGeneRAI import scGeneRAI
