@@ -152,7 +152,7 @@ class scGeneRAI:
     def __init__(self):
         pass
 
-    def fit(self, data, nepochs, model_depth, lr=2e-2, batch_size=50, lr_decay = 0.995, descriptors = None, early_stopping = True, device_name = 'cpu'):
+    def fit(self, data, nepochs, model_depth, lr=2e-2, batch_size=5, lr_decay = 0.995, descriptors = None, early_stopping = True, device_name = 'cpu'):
 
         self.simple_features = data.shape[1]
         if descriptors is not None:
