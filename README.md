@@ -1,5 +1,7 @@
 # scGeneRAI
-  
+
+Please cite [Keyl et al] (https://academic.oup.com/nar/article/51/4/e20/6984592?login=false) 
+
 ```python
   from scGeneRAI import scGeneRAI
   
@@ -35,4 +37,3 @@
 - device_name: Can be used to run computation on GPU (e.g. with 'cuda:0', default='cpu'). device_name is handed to torch.device().
 - PATH: PATH defines the location where locations will be saved. (default = '.')
   
-
