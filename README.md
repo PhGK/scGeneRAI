@@ -1,6 +1,6 @@
 # scGeneRAI
 
-Please cite [Keyl et al] (https://academic.oup.com/nar/article/51/4/e20/6984592?login=false) 
+Please cite [Keyl et al](https://academic.oup.com/nar/article/51/4/e20/6984592?login=false) 
 
 ```python
   from scGeneRAI import scGeneRAI
