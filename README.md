@@ -2,7 +2,6 @@
 
 Please cite [our paper](https://academic.oup.com/nar/article/51/4/e20/6984592?login=false) 
 
-Have a look at the example.ipynb file, which quickly guides through the most important functions of scGeneRAI. 
 
 ```python
   from scGeneRAI import scGeneRAI
@@ -39,3 +38,5 @@ Have a look at the example.ipynb file, which quickly guides through the most imp
 - device_name: Can be used to run computation on GPU (e.g. with 'cuda:0', default='cpu'). device_name is handed to torch.device().
 - PATH: PATH defines the location where locations will be saved. (default = '.')
   
+
+**Have a look at the example.ipynb file, which quickly guides through the most important functions of scGeneRAI and applies them to a small dataset.**
