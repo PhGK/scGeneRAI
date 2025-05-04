@@ -2,6 +2,8 @@
 
 Please cite [our paper](https://academic.oup.com/nar/article/51/4/e20/6984592?login=false) 
 
+Have a look at the example.ipynb file, which quickly guides through the most important functions of scGeneRAI. 
+
 ```python
   from scGeneRAI import scGeneRAI
   
